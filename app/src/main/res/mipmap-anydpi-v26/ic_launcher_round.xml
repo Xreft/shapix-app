@@ -1,14 +1,6 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-  <application android:label="Shapix"
-      android:icon="@mipmap/ic_launcher"
-      android:roundIcon="@mipmap/ic_launcher_round"
-      android:theme="@android:style/Theme.Material.NoActionBar">
-    <activity android:name=".MainActivity" android:exported="true"
-        android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|uiMode|locale|layoutDirection">
-      <intent-filter>
-        <action android:name="android.intent.action.MAIN"/>
-        <category android:name="android.intent.category.LAUNCHER"/>
-      </intent-filter>
-    </activity>
-  </application>
-</manifest>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ic_launcher_background"/>
+    <foreground>
+        <inset android:drawable="@drawable/shapix_icon" android:inset="16.67%"/>
+    </foreground>
+</adaptive-icon>
