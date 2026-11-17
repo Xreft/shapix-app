@@ -9,7 +9,7 @@ android {
     defaultConfig {
         applicationId = "com.xreft.shapix"
         minSdk = 29; targetSdk = 34
-        versionCode = 1; versionName = "2.0"
+        versionCode = 1; versionName = "1.0"
     }
     buildFeatures { compose = true }
     compileOptions {
