@@ -11,7 +11,7 @@ fun tr(lang: Lang, key: String): String =
 
 val STRINGS: Map<Lang, Map<String, String>> = mapOf(
     Lang.Ar to mapOf(
-        "appName" to "قصّاص", "tag" to "نسخة 2.0 • يعمل على جهازك", "titleSub" to "محرر الصور",
+        "appName" to "قصّاص", "tag" to "نسخة 1.0 • يعمل على جهازك", "titleSub" to "محرر الصور",
         "subtitle" to "اختر صورتك، حدد الشكل، ارسم وأضف فلاتر، ثم احفظها بخلفية شفافة.",
         "toolsHeading" to "أدوات التحرير", "dropTitle" to "اضغط لاختيار صورة",
         "dropHint" to "PNG وJPEG وWebP وGIF ثابت • حد 20 ميغابايت",
@@ -38,7 +38,7 @@ val STRINGS: Map<Lang, Map<String, String>> = mapOf(
         "msgDrawCleared" to "تم مسح الرسم."
     ),
     Lang.Fa to mapOf(
-        "appName" to "شپیکس", "tag" to "نسخه ۲٫۰ • اجرا روی دستگاه شما", "titleSub" to "ویرایشگر عکس",
+        "appName" to "شپیکس", "tag" to "نسخه 1.0 • اجرا روی دستگاه شما", "titleSub" to "ویرایشگر عکس",
         "subtitle" to "عکس را انتخاب کنید، شکل برش را برگزینید، نقاشی و فیلتر اضافه کنید و با پس‌زمینه شفاف ذخیره کنید.",
         "toolsHeading" to "ابزارهای ویرایش", "dropTitle" to "برای انتخاب عکس ضربه بزنید",
         "dropHint" to "PNG، JPEG، WebP، GIF ثابت • حداکثر ۲۰ مگابایت",
@@ -65,7 +65,7 @@ val STRINGS: Map<Lang, Map<String, String>> = mapOf(
         "msgDrawCleared" to "نقاشی پاک شد."
     ),
     Lang.En to mapOf(
-        "appName" to "Shapix", "tag" to "v2.0 • runs on your device", "titleSub" to "Image Editor",
+        "appName" to "Shapix", "tag" to "v1.0 • runs on your device", "titleSub" to "Image Editor",
         "subtitle" to "Pick a photo, choose a shape, draw and add filters, then save it with a transparent background.",
         "toolsHeading" to "Editing Tools", "dropTitle" to "Tap to choose an image",
         "dropHint" to "PNG, JPEG, WebP, static GIF • 20MB max",
