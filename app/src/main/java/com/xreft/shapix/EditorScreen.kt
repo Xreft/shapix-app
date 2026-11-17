@@ -31,6 +31,7 @@ import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
+import android.widget.Toast
 
 val BG = Color(0xFF0B1020)
 val PANEL = Color(0xFF151E31)
@@ -77,6 +78,10 @@ fun EditorScreen(lang: Lang, onLang: (Lang) -> Unit) {
     }
     val src = remember(original, s.blur) { original?.fastBlur(s.blur) }
 
+    fun say(key: String) {
+        statusKey = key
+        Toast.makeText(ctx, tr(lang, key), Toast.LENGTH_SHORT).show()
+    }
     fun upd(n: EditorState) { s = original?.let { clamp(n, it) } ?: n }
     fun pushUndo() {
         undo.addLast(drawBmp.copy(Bitmap.Config.ARGB_8888, false))
@@ -95,7 +100,7 @@ fun EditorScreen(lang: Lang, onLang: (Lang) -> Unit) {
             zoom = 1f, rotation = 0f, size = .9f, x = 0f, y = 0f, flipX = false, flipY = false,
             filter = FilterType.None, brightness = 100f, contrast = 100f, saturate = 100f, blur = 0f
         )
-        clearDraw(); statusKey = "msgReset"
+        clearDraw(); say("msgReset")
     }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
@@ -103,162 +108,158 @@ fun EditorScreen(lang: Lang, onLang: (Lang) -> Unit) {
             is ImageIO.Load.Ok -> {
                 original = r.bmp; fileName = r.name
                 s = EditorState(shape = s.shape, transparent = s.transparent, bg = s.bg)
-                clearDraw(); statusKey = "msgUploaded"
+                clearDraw(); say("msgUploaded")
             }
-            is ImageIO.Load.Err -> statusKey = r.key
+            is ImageIO.Load.Err -> say(r.key)
         }
     }
 
-    Column(
-        Modifier.fillMaxSize().systemBarsPadding().verticalScroll(rememberScrollState()).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-            Column(Modifier.weight(1f)) {
-                Text(t("tag"), color = TEAL, fontSize = 12.sp)
-                Text("✂️ ${t("appName")} | ${t("titleSub")}", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                Text(t("subtitle"), color = MUTED, fontSize = 13.sp)
-            }
+    Column(Modifier.fillMaxSize().systemBarsPadding().padding(horizontal = 12.dp, vertical = 8.dp)) {
+
+        // ===== الجزء الثابت: العنوان + المعاينة + زر الصورة =====
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("✂️ ${t("appName")} | ${t("titleSub")}", fontSize = 18.sp,
+                fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
             LangMenu(lang, onLang)
         }
-
-        Panel {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(t("previewHeading"), fontWeight = FontWeight.Bold)
-                Text(t("previewHint"), color = MUTED, fontSize = 11.sp)
-            }
-            Spacer(Modifier.height(10.dp))
-            Box(
-                Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(16.dp)).background(Color(0xFF202A3D)),
-                contentAlignment = Alignment.Center
-            ) {
-                Canvas(
-                    Modifier.fillMaxSize().pointerInput(drawMode, original) {
-                        if (original == null) return@pointerInput
-                        val k = W / size.width.toFloat()
-                        if (!drawMode) {
-                            detectDragGestures { change, drag ->
+        Spacer(Modifier.height(6.dp))
+        Box(
+            Modifier.align(Alignment.CenterHorizontally).size(300.dp)
+                .clip(RoundedCornerShape(16.dp)).background(Color(0xFF202A3D)),
+            contentAlignment = Alignment.Center
+        ) {
+            Canvas(
+                Modifier.fillMaxSize().pointerInput(drawMode, original) {
+                    if (original == null) return@pointerInput
+                    val k = W / size.width.toFloat()
+                    if (!drawMode) {
+                        detectDragGestures { change, drag ->
+                            change.consume()
+                            upd(s.copy(x = s.x + drag.x * k, y = s.y + drag.y * k))
+                        }
+                    } else {
+                        var last = Offset.Zero
+                        detectDragGestures(
+                            onDragStart = { o ->
+                                pushUndo()
+                                last = o * k
+                                brush.color = drawColor; brush.strokeWidth = brushSize
+                                drawCanvas.drawPoint(last.x, last.y, brush)
+                                tick++
+                            },
+                            onDrag = { change, _ ->
                                 change.consume()
-                                upd(s.copy(x = s.x + drag.x * k, y = s.y + drag.y * k))
+                                val p = change.position * k
+                                brush.color = drawColor; brush.strokeWidth = brushSize
+                                drawCanvas.drawLine(last.x, last.y, p.x, p.y, brush)
+                                last = p; tick++
                             }
-                        } else {
-                            var last = Offset.Zero
-                            detectDragGestures(
-                                onDragStart = { o ->
-                                    pushUndo()
-                                    last = o * k
-                                    brush.color = drawColor; brush.strokeWidth = brushSize
-                                    drawCanvas.drawPoint(last.x, last.y, brush)
-                                    tick++
-                                },
-                                onDrag = { change, _ ->
-                                    change.consume()
-                                    val p = change.position * k
-                                    brush.color = drawColor; brush.strokeWidth = brushSize
-                                    drawCanvas.drawLine(last.x, last.y, p.x, p.y, brush)
-                                    last = p; tick++
-                                }
-                            )
+                        )
+                    }
+                }
+            ) {
+                val redraw = tick
+                val b = src
+                if (b != null) drawIntoCanvas { c ->
+                    val nc = c.nativeCanvas
+                    val k = size.width / W
+                    nc.save(); nc.scale(k, k)
+                    render(nc, s, b, drawBmp)
+                    nc.restore()
+                }
+            }
+            if (original == null) Text(t("emptyText"), color = MUTED, modifier = Modifier.padding(20.dp))
+        }
+        Spacer(Modifier.height(8.dp))
+        Button(
+            onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+            modifier = Modifier.fillMaxWidth()
+        ) { Text("🖼️ ${t("dropTitle")}") }
+        if (statusKey.isNotEmpty()) Text(t(statusKey), color = TEAL, fontSize = 12.sp)
+        Spacer(Modifier.height(8.dp))
+
+        // ===== الجزء المتحرك: الأدوات فقط =====
+        Column(
+            Modifier.weight(1f).verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Panel {
+                Text(t("toolsHeading"), fontWeight = FontWeight.Bold)
+                Section(t("shapeHeading")) {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        SHAPES.forEach { (sh, g, key) -> Chip(s.shape == sh, "$g ${t(key)}") { upd(s.copy(shape = sh)) } }
+                    }
+                }
+                Sl(t("zoomLabel"), "${(s.zoom * 100).roundToInt()}%", s.zoom * 100, 50f..300f) { upd(s.copy(zoom = it / 100f)) }
+                Sl(t("rotationLabel"), "${s.rotation.roundToInt()}°", s.rotation, -180f..180f) { upd(s.copy(rotation = it)) }
+                Sl(t("sizeLabel"), "${(s.size * 100).roundToInt()}%", s.size * 100, 20f..100f) { upd(s.copy(size = it / 100f)) }
+
+                Section(t("flipHeading")) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = { upd(s.copy(flipX = !s.flipX)) }, modifier = Modifier.weight(1f)) { Text("⇋ ${t("flipH")}") }
+                        OutlinedButton(onClick = { upd(s.copy(flipY = !s.flipY)) }, modifier = Modifier.weight(1f)) { Text("⇵ ${t("flipV")}") }
+                    }
+                }
+                Section(t("filtersHeading")) {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FILTERS.forEach { (f, key) -> Chip(s.filter == f, t(key)) { upd(s.copy(filter = f)) } }
+                    }
+                }
+                Sl(t("brightnessLabel"), "${s.brightness.roundToInt()}%", s.brightness, 40f..180f) { upd(s.copy(brightness = it)) }
+                Sl(t("contrastLabel"), "${s.contrast.roundToInt()}%", s.contrast, 40f..180f) { upd(s.copy(contrast = it)) }
+                Sl(t("saturateLabel"), "${s.saturate.roundToInt()}%", s.saturate, 0f..220f) { upd(s.copy(saturate = it)) }
+                Sl(t("blurLabel"), "${s.blur}px", s.blur, 0f..10f) { upd(s.copy(blur = (it * 2).roundToInt() / 2f)) }
+
+                Section(t("modeHeading")) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Chip(!drawMode, t("modeMove")) { drawMode = false }
+                        Chip(drawMode, t("modeDraw")) { drawMode = true }
+                    }
+                    if (drawMode) {
+                        Spacer(Modifier.height(10.dp))
+                        Text(t("colorLabel"), color = MUTED, fontSize = 13.sp)
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            PALETTE.forEach { c -> Swatch(c, drawColor == c.toInt()) { drawColor = c.toInt() } }
+                        }
+                        Sl(t("brushLabel"), "${brushSize.roundToInt()}", brushSize, 2f..40f) { brushSize = it }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(onClick = { doUndo() }, modifier = Modifier.weight(1f)) { Text(t("undoBtn")) }
+                            OutlinedButton(
+                                onClick = { clearDraw(); say("msgDrawCleared") },
+                                modifier = Modifier.weight(1f)
+                            ) { Text(t("clearBtn")) }
                         }
                     }
-                ) {
-                    val redraw = tick
-                    val b = src
-                    if (b != null) drawIntoCanvas { c ->
-                        val nc = c.nativeCanvas
-                        val k = size.width / W
-                        nc.save(); nc.scale(k, k)
-                        render(nc, s, b, drawBmp)
-                        nc.restore()
-                    }
                 }
-                if (original == null) Text(t("emptyText"), color = MUTED, modifier = Modifier.padding(20.dp))
-            }
-            Spacer(Modifier.height(10.dp))
-            Button(
-                onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
-                modifier = Modifier.fillMaxWidth()
-            ) { Text("🖼️ ${t("dropTitle")}") }
-            Text(t("dropHint"), color = MUTED, fontSize = 11.sp)
-            if (statusKey.isNotEmpty()) Text(t(statusKey), color = TEAL, fontSize = 13.sp)
-        }
 
-        Panel {
-            Text(t("toolsHeading"), fontWeight = FontWeight.Bold)
-            Section(t("shapeHeading")) {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SHAPES.forEach { (sh, g, key) -> Chip(s.shape == sh, "$g ${t(key)}") { upd(s.copy(shape = sh)) } }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = s.transparent, onCheckedChange = { s = s.copy(transparent = it) })
+                    Text(t("transparentLabel"), fontSize = 14.sp)
                 }
-            }
-            Sl(t("zoomLabel"), "${(s.zoom * 100).roundToInt()}%", s.zoom * 100, 50f..300f) { upd(s.copy(zoom = it / 100f)) }
-            Sl(t("rotationLabel"), "${s.rotation.roundToInt()}°", s.rotation, -180f..180f) { upd(s.copy(rotation = it)) }
-            Sl(t("sizeLabel"), "${(s.size * 100).roundToInt()}%", s.size * 100, 20f..100f) { upd(s.copy(size = it / 100f)) }
-
-            Section(t("flipHeading")) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = { upd(s.copy(flipX = !s.flipX)) }, modifier = Modifier.weight(1f)) { Text("⇋ ${t("flipH")}") }
-                    OutlinedButton(onClick = { upd(s.copy(flipY = !s.flipY)) }, modifier = Modifier.weight(1f)) { Text("⇵ ${t("flipV")}") }
-                }
-            }
-            Section(t("filtersHeading")) {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FILTERS.forEach { (f, key) -> Chip(s.filter == f, t(key)) { upd(s.copy(filter = f)) } }
-                }
-            }
-            Sl(t("brightnessLabel"), "${s.brightness.roundToInt()}%", s.brightness, 40f..180f) { upd(s.copy(brightness = it)) }
-            Sl(t("contrastLabel"), "${s.contrast.roundToInt()}%", s.contrast, 40f..180f) { upd(s.copy(contrast = it)) }
-            Sl(t("saturateLabel"), "${s.saturate.roundToInt()}%", s.saturate, 0f..220f) { upd(s.copy(saturate = it)) }
-            Sl(t("blurLabel"), "${s.blur}px", s.blur, 0f..10f) { upd(s.copy(blur = (it * 2).roundToInt() / 2f)) }
-
-            Section(t("modeHeading")) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Chip(!drawMode, t("modeMove")) { drawMode = false }
-                    Chip(drawMode, t("modeDraw")) { drawMode = true }
-                }
-                if (drawMode) {
-                    Spacer(Modifier.height(10.dp))
-                    Text(t("colorLabel"), color = MUTED, fontSize = 13.sp)
+                if (!s.transparent) {
+                    Text(t("bgColorLabel"), color = MUTED, fontSize = 13.sp)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        PALETTE.forEach { c -> Swatch(c, drawColor == c.toInt()) { drawColor = c.toInt() } }
+                        PALETTE.forEach { c -> Swatch(c, s.bg == c.toInt()) { s = s.copy(bg = c.toInt()) } }
                     }
-                    Sl(t("brushLabel"), "${brushSize.roundToInt()}", brushSize, 2f..40f) { brushSize = it }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = { doUndo() }, modifier = Modifier.weight(1f)) { Text(t("undoBtn")) }
-                        OutlinedButton(
-                            onClick = { clearDraw(); statusKey = "msgDrawCleared" },
-                            modifier = Modifier.weight(1f)
-                        ) { Text(t("clearBtn")) }
-                    }
+                }
+
+                Spacer(Modifier.height(6.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { resetAll() }, enabled = original != null, modifier = Modifier.weight(1f)) { Text(t("resetBtn")) }
+                    Button(
+                        onClick = {
+                            val b = src
+                            val ok = b != null && ImageIO.saveToGallery(ctx, export(s, b, drawBmp), fileName)
+                            say(if (ok) "msgDownloaded" else "msgExportFail")
+                        },
+                        enabled = original != null, modifier = Modifier.weight(1f)
+                    ) { Text(t("downloadBtn")) }
                 }
             }
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(checked = s.transparent, onCheckedChange = { s = s.copy(transparent = it) })
-                Text(t("transparentLabel"), fontSize = 14.sp)
-            }
-            if (!s.transparent) {
-                Text(t("bgColorLabel"), color = MUTED, fontSize = 13.sp)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    PALETTE.forEach { c -> Swatch(c, s.bg == c.toInt()) { s = s.copy(bg = c.toInt()) } }
-                }
-            }
-
-            Spacer(Modifier.height(6.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { resetAll() }, enabled = original != null, modifier = Modifier.weight(1f)) { Text(t("resetBtn")) }
-                Button(
-                    onClick = {
-                        val b = src
-                        val ok = b != null && ImageIO.saveToGallery(ctx, export(s, b, drawBmp), fileName)
-                        statusKey = if (ok) "msgDownloaded" else "msgExportFail"
-                    },
-                    enabled = original != null, modifier = Modifier.weight(1f)
-                ) { Text(t("downloadBtn")) }
-            }
+            Text(t("bottomText"), color = MUTED, fontSize = 12.sp, lineHeight = 20.sp)
+            Text(t("footerText"), color = MUTED, fontSize = 11.sp, modifier = Modifier.fillMaxWidth())
         }
-
-        Text(t("bottomText"), color = MUTED, fontSize = 12.sp, lineHeight = 20.sp)
-        Text(t("footerText"), color = MUTED, fontSize = 11.sp, modifier = Modifier.fillMaxWidth())
     }
 }
 
