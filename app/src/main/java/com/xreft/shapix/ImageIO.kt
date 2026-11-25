@@ -2,6 +2,7 @@ package com.xreft.shapix
 
 import android.content.ContentValues
 import android.content.Context
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
@@ -10,6 +11,11 @@ import android.net.Uri
 import android.provider.MediaStore
 import android.provider.OpenableColumns
 import kotlin.math.max
+
+enum class ExportFormat(val mime: String, val ext: String) {
+    Png("image/png", "png"),
+    Jpeg("image/jpeg", "jpg")
+}
 
 object ImageIO {
     sealed class Load {
@@ -68,23 +74,38 @@ object ImageIO {
         }
     }
 
-    fun saveToGallery(ctx: Context, bmp: Bitmap, name: String): Boolean {
+    fun save(ctx: Context, bmp: Bitmap, name: String, fmt: ExportFormat): Uri? {
         return try {
             val cr = ctx.contentResolver
             val v = ContentValues().apply {
-                put(MediaStore.Images.Media.DISPLAY_NAME, "$name-shapix-${System.currentTimeMillis()}.png")
-                put(MediaStore.Images.Media.MIME_TYPE, "image/png")
+                put(MediaStore.Images.Media.DISPLAY_NAME, "$name-shapix-${System.currentTimeMillis()}.${fmt.ext}")
+                put(MediaStore.Images.Media.MIME_TYPE, fmt.mime)
                 put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Shapix")
                 put(MediaStore.Images.Media.IS_PENDING, 1)
             }
             val uri = cr.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, v)!!
-            cr.openOutputStream(uri)!!.use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            cr.openOutputStream(uri)!!.use {
+                if (fmt == ExportFormat.Png) bmp.compress(Bitmap.CompressFormat.PNG, 100, it)
+                else bmp.compress(Bitmap.CompressFormat.JPEG, 92, it)
+            }
             v.clear()
             v.put(MediaStore.Images.Media.IS_PENDING, 0)
             cr.update(uri, v, null, null)
-            true
+            uri
         } catch (e: Exception) {
-            false
+            null
+        }
+    }
+
+    fun share(ctx: Context, uri: Uri, mime: String) {
+        try {
+            val send = Intent(Intent.ACTION_SEND).apply {
+                type = mime
+                putExtra(Intent.EXTRA_STREAM, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            ctx.startActivity(Intent.createChooser(send, null))
+        } catch (e: Exception) {
         }
     }
 }
