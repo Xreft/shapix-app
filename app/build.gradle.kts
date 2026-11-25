@@ -9,7 +9,7 @@ android {
     defaultConfig {
         applicationId = "com.xreft.shapix"
         minSdk = 29; targetSdk = 34
-        versionCode = 1; versionName = "1.0"
+        versionCode = 2; versionName = "1.1"
     }
     signingConfigs {
         create("release") {
@@ -43,4 +43,5 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.ui:ui")
+    implementation("com.adivery:sdk:4.10.0")
 }
