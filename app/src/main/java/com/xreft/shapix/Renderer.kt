@@ -56,8 +56,14 @@ fun render(c: Canvas, s: EditorState, src: Bitmap, draw: Bitmap?) {
     draw?.let { c.drawBitmap(it, 0f, 0f, null) }
 }
 
-fun export(s: EditorState, src: Bitmap, draw: Bitmap?): Bitmap =
-    Bitmap.createBitmap(W, W, Bitmap.Config.ARGB_8888).also { render(Canvas(it), s, src, draw) }
+fun export(s: EditorState, src: Bitmap, draw: Bitmap?, size: Int = W): Bitmap {
+    val out = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+    val c = Canvas(out)
+    val k = size / W.toFloat()
+    c.scale(k, k)
+    render(c, s, src, draw)
+    return out
+}
 
 private fun filterMatrix(s: EditorState): ColorMatrix {
     val m = ColorMatrix()
