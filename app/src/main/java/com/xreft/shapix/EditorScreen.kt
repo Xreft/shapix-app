@@ -6,11 +6,13 @@ import android.graphics.Bitmap
 import android.graphics.Paint
 import android.graphics.PorterDuff
 import android.graphics.Canvas as AndroidCanvas
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -31,7 +33,6 @@ import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
-import android.widget.Toast
 
 val BG = Color(0xFF0B1020)
 val PANEL = Color(0xFF151E31)
@@ -67,6 +68,9 @@ fun EditorScreen(lang: Lang, onLang: (Lang) -> Unit) {
     var drawColor by remember { mutableStateOf(PALETTE[0].toInt()) }
     var brushSize by remember { mutableFloatStateOf(8f) }
     var tick by remember { mutableIntStateOf(0) }
+    var exportSize by remember { mutableIntStateOf(800) }
+    var exportFmt by remember { mutableStateOf(ExportFormat.Png) }
+    var saveCount by remember { mutableIntStateOf(0) }
 
     val drawBmp = remember { Bitmap.createBitmap(W, W, Bitmap.Config.ARGB_8888) }
     val drawCanvas = remember { AndroidCanvas(drawBmp) }
@@ -102,6 +106,21 @@ fun EditorScreen(lang: Lang, onLang: (Lang) -> Unit) {
         )
         clearDraw(); say("msgReset")
     }
+    fun doSave(share: Boolean) {
+        val b = src
+        if (b == null) { say("msgExportFail"); return }
+        val st = if (exportFmt == ExportFormat.Jpeg && s.transparent)
+            s.copy(transparent = false, bg = 0xFFFFFFFF.toInt()) else s
+        val uri = ImageIO.save(ctx, export(st, b, drawBmp, exportSize), fileName, exportFmt)
+        if (uri == null) { say("msgExportFail"); return }
+        if (share) {
+            ImageIO.share(ctx, uri, exportFmt.mime)
+        } else {
+            say("msgDownloaded")
+            saveCount++
+            if (saveCount % 3 == 0) Ads.showInterstitialIfReady()
+        }
+    }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) when (val r = ImageIO.load(ctx, uri)) {
@@ -116,7 +135,6 @@ fun EditorScreen(lang: Lang, onLang: (Lang) -> Unit) {
 
     Column(Modifier.fillMaxSize().systemBarsPadding().padding(horizontal = 12.dp, vertical = 8.dp)) {
 
-        // ===== الجزء الثابت: العنوان + المعاينة + زر الصورة =====
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text("✂️ ${t("appName")} | ${t("titleSub")}", fontSize = 18.sp,
                 fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
@@ -124,7 +142,7 @@ fun EditorScreen(lang: Lang, onLang: (Lang) -> Unit) {
         }
         Spacer(Modifier.height(6.dp))
         Box(
-            Modifier.align(Alignment.CenterHorizontally).size(300.dp)
+            Modifier.align(Alignment.CenterHorizontally).size(280.dp)
                 .clip(RoundedCornerShape(16.dp)).background(Color(0xFF202A3D)),
             contentAlignment = Alignment.Center
         ) {
@@ -133,9 +151,16 @@ fun EditorScreen(lang: Lang, onLang: (Lang) -> Unit) {
                     if (original == null) return@pointerInput
                     val k = W / size.width.toFloat()
                     if (!drawMode) {
-                        detectDragGestures { change, drag ->
-                            change.consume()
-                            upd(s.copy(x = s.x + drag.x * k, y = s.y + drag.y * k))
+                        detectTransformGestures { centroid, pan, zoom, _ ->
+                            val cx = centroid.x * k - W / 2f
+                            val cy = centroid.y * k - W / 2f
+                            val nz = (s.zoom * zoom).coerceIn(0.5f, 3f)
+                            val r = nz / s.zoom
+                            upd(s.copy(
+                                zoom = nz,
+                                x = cx + (s.x - cx) * r + pan.x * k,
+                                y = cy + (s.y - cy) * r + pan.y * k
+                            ))
                         }
                     } else {
                         var last = Offset.Zero
@@ -170,7 +195,9 @@ fun EditorScreen(lang: Lang, onLang: (Lang) -> Unit) {
             }
             if (original == null) Text(t("emptyText"), color = MUTED, modifier = Modifier.padding(20.dp))
         }
-        Spacer(Modifier.height(8.dp))
+        Text(t("previewHint"), color = MUTED, fontSize = 11.sp,
+            modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 4.dp))
+        Spacer(Modifier.height(6.dp))
         Button(
             onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
             modifier = Modifier.fillMaxWidth()
@@ -178,7 +205,6 @@ fun EditorScreen(lang: Lang, onLang: (Lang) -> Unit) {
         if (statusKey.isNotEmpty()) Text(t(statusKey), color = TEAL, fontSize = 12.sp)
         Spacer(Modifier.height(8.dp))
 
-        // ===== الجزء المتحرك: الأدوات فقط =====
         Column(
             Modifier.weight(1f).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(14.dp)
@@ -190,7 +216,6 @@ fun EditorScreen(lang: Lang, onLang: (Lang) -> Unit) {
                         SHAPES.forEach { (sh, g, key) -> Chip(s.shape == sh, "$g ${t(key)}") { upd(s.copy(shape = sh)) } }
                     }
                 }
-                Sl(t("zoomLabel"), "${(s.zoom * 100).roundToInt()}%", s.zoom * 100, 50f..300f) { upd(s.copy(zoom = it / 100f)) }
                 Sl(t("rotationLabel"), "${s.rotation.roundToInt()}°", s.rotation, -180f..180f) { upd(s.copy(rotation = it)) }
                 Sl(t("sizeLabel"), "${(s.size * 100).roundToInt()}%", s.size * 100, 20f..100f) { upd(s.copy(size = it / 100f)) }
 
@@ -243,23 +268,46 @@ fun EditorScreen(lang: Lang, onLang: (Lang) -> Unit) {
                     }
                 }
 
+                Section(t("exportHeading")) {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(512, 800, 1080).forEach { n ->
+                            Chip(exportSize == n, "$n×$n") { exportSize = n }
+                        }
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Chip(exportFmt == ExportFormat.Png, "PNG") { exportFmt = ExportFormat.Png }
+                        Chip(exportFmt == ExportFormat.Jpeg, "JPG") { exportFmt = ExportFormat.Jpeg }
+                    }
+                    Text(t("exportHint"), color = MUTED, fontSize = 11.sp, modifier = Modifier.padding(top = 6.dp))
+                    if (exportFmt == ExportFormat.Jpeg && s.transparent) {
+                        Text(t("jpgNote"), color = MUTED, fontSize = 11.sp)
+                    }
+                }
+
                 Spacer(Modifier.height(6.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = { resetAll() }, enabled = original != null, modifier = Modifier.weight(1f)) { Text(t("resetBtn")) }
                     Button(
-                        onClick = {
-                            val b = src
-                            val ok = b != null && ImageIO.saveToGallery(ctx, export(s, b, drawBmp), fileName)
-                            say(if (ok) "msgDownloaded" else "msgExportFail")
-                        },
+                        onClick = { doSave(false) },
                         enabled = original != null, modifier = Modifier.weight(1f)
                     ) { Text(t("downloadBtn")) }
+                    OutlinedButton(
+                        onClick = { doSave(true) },
+                        enabled = original != null, modifier = Modifier.weight(1f)
+                    ) { Text(t("shareBtn")) }
                 }
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = { resetAll() },
+                    enabled = original != null, modifier = Modifier.fillMaxWidth()
+                ) { Text(t("resetBtn")) }
             }
 
             Text(t("bottomText"), color = MUTED, fontSize = 12.sp, lineHeight = 20.sp)
             Text(t("footerText"), color = MUTED, fontSize = 11.sp, modifier = Modifier.fillMaxWidth())
         }
+
+        BannerAd(Ads.BANNER_ID)
     }
 }
 
