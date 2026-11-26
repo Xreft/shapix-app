@@ -118,7 +118,7 @@ fun EditorScreen(lang: Lang, onLang: (Lang) -> Unit) {
         } else {
             say("msgDownloaded")
             saveCount++
-            if (saveCount % 3 == 0) Ads.showInterstitialIfReady()
+            if (saveCount % 2 == 0) Ads.showInterstitialIfReady()
         }
     }
 
