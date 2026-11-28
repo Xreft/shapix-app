@@ -7,7 +7,8 @@ enum class Lang(val code: String, val label: String, val rtl: Boolean) {
 }
 
 fun tr(lang: Lang, key: String): String =
-    STRINGS[lang]?.get(key) ?: STRINGS[Lang.En]!![key] ?: key
+    STRINGS[lang]?.get(key) ?: BILLING_STRINGS[lang]?.get(key)
+        ?: STRINGS[Lang.En]!![key] ?: BILLING_STRINGS[Lang.En]!![key] ?: key
 
 val STRINGS: Map<Lang, Map<String, String>> = mapOf(
     Lang.Ar to mapOf(
