@@ -285,6 +285,15 @@ fun EditorScreen(lang: Lang, onLang: (Lang) -> Unit) {
                     }
                 }
 
+
+                if (!Billing.adsRemoved) {
+                    OutlinedButton(
+                       onClick = { ctx.findActivity()?.let { a -> Billing.buy(a) { key -> say(key) } } },
+                       modifier = Modifier.fillMaxWidth() ) { Text(t("removeAdsBtn")) }
+                } else {
+                    Text(t("removeAdsDone"), color = TEAL, fontSize = 12.sp)
+                }
+                
                 Spacer(Modifier.height(6.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(
