@@ -8,7 +8,11 @@ object Ads {
     const val BANNER_ID = "d814d424-634e-45b8-87eb-1f7e53584427"
     const val INTERSTITIAL_ID = "f09630be-ad40-43d9-9d37-76a83e8a75d2"
 
+    private var started = false
+
     fun init(activity: Activity) {
+        if (started) return
+        started = true
         runCatching {
             Adivery.configure(activity.application, APP_ID)
             Adivery.setLoggingEnabled(true)
@@ -17,6 +21,7 @@ object Ads {
     }
 
     fun showInterstitialIfReady() {
+        if (Billing.adsRemoved) return
         runCatching {
             if (Adivery.isLoaded(INTERSTITIAL_ID)) Adivery.showAd(INTERSTITIAL_ID)
         }
