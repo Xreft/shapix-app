@@ -307,7 +307,7 @@ fun EditorScreen(lang: Lang, onLang: (Lang) -> Unit) {
             Text(t("footerText"), color = MUTED, fontSize = 11.sp, modifier = Modifier.fillMaxWidth())
         }
 
-        BannerAd(Ads.BANNER_ID)
+        if (!Billing.adsRemoved) BannerAd(Ads.BANNER_ID)
     }
 }
 
