@@ -9,7 +9,19 @@ android {
     defaultConfig {
         applicationId = "com.xreft.shapix"
         minSdk = 29; targetSdk = 34
-        versionCode = 2; versionName = "1.1"
+        versionCode = 3; versionName = "1.2"
+
+        val marketApplicationId = "ir.mservices.market"
+        val marketBindAddress = "ir.mservices.market.InAppBillingService.BIND"
+        manifestPlaceholders["marketApplicationId"] = marketApplicationId
+        manifestPlaceholders["marketBindAddress"] = marketBindAddress
+        manifestPlaceholders["marketPermission"] = "$marketApplicationId.BILLING"
+
+        buildConfigField(
+            "String",
+            "IAB_PUBLIC_KEY",
+            "\"${System.getenv("MYKET_PUBLIC_KEY") ?: ""}\""
+        )
     }
     signingConfigs {
         create("release") {
@@ -30,7 +42,7 @@ android {
             }
         }
     }
-    buildFeatures { compose = true }
+    buildFeatures { compose = true; buildConfig = true }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -44,4 +56,5 @@ dependencies {
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.ui:ui")
     implementation("com.adivery:sdk:4.10.0")
+    implementation("ir.myket:billing:2.3")
 }
