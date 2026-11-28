@@ -20,7 +20,8 @@ import java.util.Locale
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Ads.init(this)
+        Billing.init(this)
+        if (!Billing.adsRemoved) Ads.init(this)
         val bars = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
         enableEdgeToEdge(statusBarStyle = bars, navigationBarStyle = bars)
         setContent {
@@ -40,6 +41,11 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onDestroy() {
+        Billing.dispose()
+        super.onDestroy()
     }
 }
 
